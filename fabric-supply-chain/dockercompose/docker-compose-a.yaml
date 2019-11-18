@@ -12,14 +12,14 @@ services:
 
   ca.a.example.com:
     container_name: ca.a.example.com
-    image: hyperledger/fabric-ca:x86_64-1.1.0
+    image: hyperledger/fabric-ca:latest
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
       - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.a.example.com-cert.pem
-      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/24ca93ebb300e61510a5240dd8982946b5cb3cd6cb8fb0e64c2fb43f408d69d1_sk
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/68098f6cffa360f907bd53baa1599a0d6fc6b593d166adad4e393393de9f09a3_sk
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.a.example.com-cert.pem
-      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/24ca93ebb300e61510a5240dd8982946b5cb3cd6cb8fb0e64c2fb43f408d69d1_sk
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/68098f6cffa360f907bd53baa1599a0d6fc6b593d166adad4e393393de9f09a3_sk
 #    ports:
 #      - 7054:7054
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
