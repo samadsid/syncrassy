@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -15,7 +16,7 @@ const (
 )
 
 const (
-	basicArgumentsNumber = 6
+	basicArgumentsNumber = 5
 	keyFieldsNumber      = 1
 )
 
@@ -67,17 +68,17 @@ type ProductKey struct {
 }
 
 type ProductValue struct {
-	ObjectType  string  `json:"docType"`
-	Desc        string  `json:"desc"`
-	State       int     `json:"state"`
-	LastUpdated int     `json:"lastUpdated"`
-	Owner       string  `json:"owner"`
-	Price       float64 `json:"price"`
+	ObjectType  string `json:"docType"`
+	Desc        string `json:"desc"`
+	State       int    `json:"state"`
+	LastUpdated int    `json:"lastUpdated"`
+	Owner       string `json:"owner"`
+	Label       string `json:"label"`
 }
 
 func (product *Product) FillFromArguments(args []string) error {
-	//      0            1         2       3        4
-	// productName, description, status, owner, timestamp
+	//      0            1         2       3      4
+	// productName, description, status, owner, label
 	if len(args) < basicArgumentsNumber {
 		return errors.New(fmt.Sprintf("incorrect number of arguments: expected %d, got %d",
 			basicArgumentsNumber, len(args)))
@@ -100,22 +101,21 @@ func (product *Product) FillFromArguments(args []string) error {
 		return errors.New(fmt.Sprintf("product state is invalid: %s (must be int)", args[keyFieldsNumber+1]))
 	}
 	owner := strings.ToLower(args[keyFieldsNumber+2])
-	lastUpdated, err := strconv.Atoi(args[keyFieldsNumber+3])
-	if err != nil {
-		return errors.New(fmt.Sprintf("product last change time is invalid: %s (must be int)",
-			args[keyFieldsNumber+3]))
-	}
-	price, err := strconv.ParseFloat(args[keyFieldsNumber+4], 64)
+	lastUpdated := int(time.Now().UnixNano() / 1e6)
 
 	if !contains(productStateMachine, state) {
 		return errors.New(fmt.Sprintf("product is invalid: %d (must be from 0 to 4)", state))
 	}
 
+	// Label
+	label := strings.ToLower(args[keyFieldsNumber+3])
+
 	product.Value.Desc = desc
 	product.Value.State = state
 	product.Value.Owner = owner
 	product.Value.LastUpdated = lastUpdated
-	product.Value.Price = price
+	product.Value.Label = label
+
 	return nil
 }
 
