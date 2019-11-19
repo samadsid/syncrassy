@@ -16,10 +16,10 @@ services:
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
       - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.a.example.com-cert.pem
-      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/68098f6cffa360f907bd53baa1599a0d6fc6b593d166adad4e393393de9f09a3_sk
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/5e699f59d1d85c1ec63c17669797d08de453b9c0906420e0ddbfcba4b91c8d4b_sk
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.a.example.com-cert.pem
-      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/68098f6cffa360f907bd53baa1599a0d6fc6b593d166adad4e393393de9f09a3_sk
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/5e699f59d1d85c1ec63c17669797d08de453b9c0906420e0ddbfcba4b91c8d4b_sk
 #    ports:
 #      - 7054:7054
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
@@ -129,7 +129,7 @@ services:
 
   couchdb.a.example.com:
     container_name: couchdb.a.example.com
-    image: hyperledger/fabric-couchdb:latest
+    image: hyperledger/fabric-couchdb:0.4.10
     # Populate the COUCHDB_USER and COUCHDB_PASSWORD to set an admin user and password
     # for CouchDB.  This will prevent CouchDB from operating in an "Admin Party" mode.
 #    environment:
