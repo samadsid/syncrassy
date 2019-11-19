@@ -1,15 +1,16 @@
 package main
 
 import (
-	"strconv"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
+
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
-	"encoding/pem"
-	"crypto/x509"
-	"strings"
 )
 
 var logger = shim.NewLogger("ProductChaincode")
@@ -62,37 +63,53 @@ func (t *ProductChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 // initProduct - create a new product, store into chaincode state
 // ============================================================
 func (t *ProductChaincode) initProduct(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-	var product Product
-	if err := product.FillFromArguments(args); err != nil {
-		return shim.Error(err.Error())
+
+	// For loop on quantity
+	quantity, _ := strconv.Atoi(args[6])
+
+	for i := 0; i < quantity; i++ {
+
+		finalProduct := args[0] + "_" + strconv.Itoa(i)
+		var finalArgs []string
+		finalArgs = append(finalArgs, finalProduct)
+		finalArgs = append(finalArgs, args[1])
+		finalArgs = append(finalArgs, args[2])
+		finalArgs = append(finalArgs, args[3])
+		finalArgs = append(finalArgs, args[4])
+
+		var product Product
+		if err := product.FillFromArguments(args); err != nil {
+			return shim.Error(err.Error())
+		}
+
+		if product.ExistsIn(stub) {
+			compositeKey, _ := product.ToCompositeKey(stub)
+			return shim.Error(fmt.Sprintf("product with the key %s already exists", compositeKey))
+		}
+
+		// TODO: set owner from GetCreatorOrg
+		product.Value.State = stateRegistered
+
+		if err := product.UpdateOrInsertIn(stub); err != nil {
+			return shim.Error(err.Error())
+		}
+
+		// TODO: think about index usability
+		//  ==== Index the product to enable state-based range queries, e.g. return all Active products ====
+		//  An 'index' is a normal key/value entry in state.
+		//  The key is a composite key, with the elements that you want to range query on listed first.
+		//  In our case, the composite key is based on stateIndexName~state~name.
+		//  This will enable very efficient state range queries based on composite keys matching stateIndexName~state~*
+		//stateIndexKey, err := stub.CreateCompositeKey(stateIndexName, []string{strconv.Itoa(product.Value.State), product.Key.Name})
+		//if err != nil {
+		//	return shim.Error(err.Error())
+		//}
+		////  Save index entry to state. Only the key name is needed, no need to store a duplicate copy of the product.
+		////  Note - passing a 'nil' value will effectively delete the key from state, therefore we pass null character as value
+		//value := []byte{0x00}
+		//stub.PutState(stateIndexKey, value)
+
 	}
-
-	if product.ExistsIn(stub) {
-		compositeKey, _ := product.ToCompositeKey(stub)
-		return shim.Error(fmt.Sprintf("product with the key %s already exists", compositeKey))
-	}
-
-	// TODO: set owner from GetCreatorOrg
-	product.Value.State = stateRegistered
-
-	if err := product.UpdateOrInsertIn(stub); err != nil {
-		return shim.Error(err.Error())
-	}
-
-	// TODO: think about index usability
-	//  ==== Index the product to enable state-based range queries, e.g. return all Active products ====
-	//  An 'index' is a normal key/value entry in state.
-	//  The key is a composite key, with the elements that you want to range query on listed first.
-	//  In our case, the composite key is based on stateIndexName~state~name.
-	//  This will enable very efficient state range queries based on composite keys matching stateIndexName~state~*
-	//stateIndexKey, err := stub.CreateCompositeKey(stateIndexName, []string{strconv.Itoa(product.Value.State), product.Key.Name})
-	//if err != nil {
-	//	return shim.Error(err.Error())
-	//}
-	////  Save index entry to state. Only the key name is needed, no need to store a duplicate copy of the product.
-	////  Note - passing a 'nil' value will effectively delete the key from state, therefore we pass null character as value
-	//value := []byte{0x00}
-	//stub.PutState(stateIndexKey, value)
 
 	return shim.Success(nil)
 }
@@ -349,10 +366,10 @@ func (t *ProductChaincode) getHistoryForProduct(stub shim.ChaincodeStubInterface
 	defer resultsIterator.Close()
 
 	type productHistory struct {
-		Value ProductValue `json:"value"`
-		TxId string `json:"txId"`
-		Timestamp string `json:"timestamp"`
-		IsDelete bool `json:"isDelete"`
+		Value     ProductValue `json:"value"`
+		TxId      string       `json:"txId"`
+		Timestamp string       `json:"timestamp"`
+		IsDelete  bool         `json:"isDelete"`
 	}
 
 	entries := []productHistory{}
@@ -401,16 +418,16 @@ func (t *ProductChaincode) updateOwner(stub shim.ChaincodeStubInterface, args []
 	// ==== Input sanitation ====
 	for k, v := range args[1:] {
 		if len(v) == 0 {
-			return shim.Error(fmt.Sprintf("argument #%d must be a non-empty string", k + 1))
+			return shim.Error(fmt.Sprintf("argument #%d must be a non-empty string", k+1))
 		}
 	}
 
 	oldOwner := args[keyFieldsNumber]
-	newOwner := args[keyFieldsNumber + 1]
-	lastUpdated, err := strconv.Atoi(args[keyFieldsNumber + 2])
+	newOwner := args[keyFieldsNumber+1]
+	lastUpdated, err := strconv.Atoi(args[keyFieldsNumber+2])
 	if err != nil {
 		return shim.Error(fmt.Sprintf("product last change time is invalid: %s (must be int)",
-			args[keyFieldsNumber + 2]))
+			args[keyFieldsNumber+2]))
 	}
 
 	// TODO: check if creator org and oldOwner are the same

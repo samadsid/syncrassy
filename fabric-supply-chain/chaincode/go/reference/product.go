@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -73,11 +74,12 @@ type ProductValue struct {
 	LastUpdated int     `json:"lastUpdated"`
 	Owner       string  `json:"owner"`
 	Price       float64 `json:"price"`
+	Label       string  `json:"label"`
 }
 
 func (product *Product) FillFromArguments(args []string) error {
-	//      0            1         2       3        4
-	// productName, description, status, owner, timestamp
+	//      0            1         2       3      4	      5
+	// productName, description, status, owner, label	price
 	if len(args) < basicArgumentsNumber {
 		return errors.New(fmt.Sprintf("incorrect number of arguments: expected %d, got %d",
 			basicArgumentsNumber, len(args)))
@@ -100,7 +102,7 @@ func (product *Product) FillFromArguments(args []string) error {
 		return errors.New(fmt.Sprintf("product state is invalid: %s (must be int)", args[keyFieldsNumber+1]))
 	}
 	owner := strings.ToLower(args[keyFieldsNumber+2])
-	lastUpdated, err := strconv.Atoi(args[keyFieldsNumber+3])
+	lastUpdated := int(time.Now().UnixNano() / 1e6)
 	if err != nil {
 		return errors.New(fmt.Sprintf("product last change time is invalid: %s (must be int)",
 			args[keyFieldsNumber+3]))
@@ -111,11 +113,16 @@ func (product *Product) FillFromArguments(args []string) error {
 		return errors.New(fmt.Sprintf("product is invalid: %d (must be from 0 to 4)", state))
 	}
 
+	// Label
+	label := strings.ToLower(args[keyFieldsNumber+3])
+
 	product.Value.Desc = desc
 	product.Value.State = state
 	product.Value.Owner = owner
 	product.Value.LastUpdated = lastUpdated
+	product.Value.Label = label
 	product.Value.Price = price
+
 	return nil
 }
 
