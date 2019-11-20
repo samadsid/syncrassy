@@ -751,6 +751,10 @@ func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterf
 		return shim.Error("Incorrect number of arguments. Expecting 1")
 	}
 
+	type details struct {
+		Status string `json:"status"`
+	}
+
 	it, err := stub.GetStateByPartialCompositeKey(transferIndex, []string{})
 	if err != nil {
 		message := fmt.Sprintf("unable to get state by partial composite key %s: %s", transferIndex, err.Error())
@@ -759,7 +763,11 @@ func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterf
 	}
 	defer it.Close()
 
-	entries := []TransferDetails{}
+	type TransferDetail struct {
+		Status string `json:"status"`
+		Sender string `json:"sender"`
+	}
+	var entries TransferDetail
 	for it.HasNext() {
 		response, err := it.Next()
 		if err != nil {
@@ -771,6 +779,13 @@ func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterf
 		logger.Debug(fmt.Sprintf("Response: {%s, %s}", response.Key, string(response.Value)))
 
 		entry := TransferDetails{}
+
+		var p details
+		if err := json.Unmarshal(response.Value, &p); err != nil {
+			message := fmt.Sprintf("unable to unmarshal response on product %s from common channel", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
 
 		if err := entry.FillFromLedgerValue(response.Value); err != nil {
 			message := fmt.Sprintf("cannot fill transfer details value from response value: %s", err.Error())
@@ -798,7 +813,8 @@ func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterf
 				logger.Debug("Entry: " + string(bytes))
 			}
 
-			entries = append(entries, entry)
+			entries.Status = p.Status
+			entries.Sender = compositeKeyParts[1]
 		}
 	}
 
@@ -812,4 +828,5 @@ func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterf
 	logger.Info("OwnershipChaincode.query exited without errors")
 	logger.Debug("Success: OwnershipChaincode.query")
 	return shim.Success(result)
+
 }
