@@ -16,10 +16,10 @@ services:
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
       - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.c.example.com-cert.pem
-      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/5f537e187597fb98c2fa0d070d8d32b9c335ce40101794c42173331d370ef748_sk
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/a8b80e86e6d0821148e22dff9610d1b676d3bc325ae3de33a53f1479041f1318_sk
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.c.example.com-cert.pem
-      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/5f537e187597fb98c2fa0d070d8d32b9c335ce40101794c42173331d370ef748_sk
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/a8b80e86e6d0821148e22dff9610d1b676d3bc325ae3de33a53f1479041f1318_sk
 #    ports:
 #      - 9054:7054
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'

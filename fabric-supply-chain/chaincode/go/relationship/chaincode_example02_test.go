@@ -1,10 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"testing"
+
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
-	"fmt"
 )
 
 func toByteArray(args []string) [][]byte {
@@ -16,7 +17,7 @@ func toByteArray(args []string) [][]byte {
 	return res
 }
 
-func getInitializedStub(t *testing.T) *shim.MockStub{
+func getInitializedStub(t *testing.T) *shim.MockStub {
 	cc := new(OwnershipChaincode)
 	stub := shim.NewMockStub("ownership", cc)
 	stub.MockInit("1", toByteArray([]string{"init"}))

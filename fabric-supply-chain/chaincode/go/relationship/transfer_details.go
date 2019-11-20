@@ -31,15 +31,32 @@ type TransferDetailsKey struct {
 }
 
 type TransferDetailsValue struct {
-	Status    string  `json:"status"`
-	Message   string  `json:"message"`
-	Timestamp int64   `json:"timestamp"`
-	Price     float64 `json:"price"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 type TransferDetails struct {
 	Key   TransferDetailsKey   `json:"key"`
 	Value TransferDetailsValue `json:"value"`
+}
+
+type Product struct {
+	Key   ProductKey   `json:"key"`
+	Value ProductValue `json:"value"`
+}
+
+type ProductKey struct {
+	Name string `json:"name"`
+}
+
+type ProductValue struct {
+	ObjectType  string `json:"docType"`
+	Desc        string `json:"desc"`
+	State       int    `json:"state"`
+	LastUpdated int    `json:"lastUpdated"`
+	Owner       string `json:"owner"`
+	Label       string `json:"label"`
 }
 
 func (details *TransferDetails) FillFromArguments(args []string) error {
@@ -154,6 +171,23 @@ func (details *TransferDetails) EmitState(stub shim.ChaincodeStubInterface) erro
 	if err = stub.SetEvent(transferIndex+"."+details.Value.Status, bytes); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (product *Product) FillFromCompositeKeyParts(compositeKeyParts []string) error {
+	if len(compositeKeyParts) < keyFieldsNumber {
+		return errors.New(fmt.Sprintf("composite key parts array must contain at least %d item(s)",
+			keyFieldsNumber))
+	}
+
+	for k, v := range compositeKeyParts {
+		if len(v) == 0 {
+			return errors.New(fmt.Sprintf("key part #%d must be a non-empty string", k+1))
+		}
+	}
+
+	product.Key.Name = compositeKeyParts[0]
 
 	return nil
 }

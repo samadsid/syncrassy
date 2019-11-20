@@ -48,6 +48,8 @@ func (t *OwnershipChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Respons
 		return t.query(stub, args)
 	} else if function == "history" {
 		return t.history(stub, args)
+	} else if function == "sendRequestBulk" {
+		return t.sendRequestBulk(stub, args)
 	}
 
 	message := "invalid invoke function name. " +
@@ -123,6 +125,119 @@ func (t *OwnershipChaincode) sendRequest(stub shim.ChaincodeStubInterface, args 
 
 	logger.Info("OwnershipChaincode.sendRequest exited without errors")
 	logger.Debug("Success: OwnershipChaincode.sendRequest")
+	return shim.Success(nil)
+}
+
+func (t *OwnershipChaincode) sendRequestBulk(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	logger.Info("OwnershipChaincode.sendRequestBulk is running")
+	logger.Debug("OwnershipChaincode.sendRequestBulk")
+
+	const expectedArgumentsNumber = 5
+
+	if len(args) < expectedArgumentsNumber {
+		message := fmt.Sprintf("insufficient number of arguments: expected %d, got %d",
+			expectedArgumentsNumber, len(args))
+		logger.Error(message)
+		return shim.Error(message)
+	}
+
+	// Required Quantity
+	label := strings.ToLower(args[0])
+	requiredQuantity, _ := strconv.Atoi(args[4])
+
+	// Get Product Belongs to required Owner
+	// queryString := fmt.Sprintf("{\"selector\":{\"owner\":\"%s\",\"label\":\"%s\"}}", args[2], label)
+	// queryResults, err := getQueryResultForQueryString(stubReference, queryString)
+	// if err != nil {
+	// 	return shim.Error(err.Error())
+	// }
+	// availableProducts := []Product{}
+	// err2 := json.Unmarshal(queryResults, &availableProducts)
+	// if err2 != nil {
+	// 	return shim.Error(fmt.Sprintf("product doesn't exist"))
+	// }
+	availableProducts, _ := getProductsFromLabel(stub, label, args[2])
+	availableProductsLength := len(availableProducts)
+
+	// If requiredQuantity < available products
+	logger.Debug("-------------------- availableProducts -------------------------------------")
+	logger.Debug(availableProducts)
+	logger.Debug("-------------------- availableProductsLength -------------------------------------")
+	logger.Debug(availableProductsLength)
+	logger.Debug("-------------------- requiredQuantity -------------------------------------")
+	logger.Debug(requiredQuantity)
+	if requiredQuantity > availableProductsLength {
+		message := "Not Enough Quantity Available"
+		logger.Error(message)
+		return shim.Error(message)
+	}
+
+	// Iterate
+	for i := 0; i < requiredQuantity; i++ {
+
+		finalProduct := availableProducts[i]
+		var finalArgs []string
+		finalArgs = append(finalArgs, finalProduct)
+		finalArgs = append(finalArgs, args[1])
+		finalArgs = append(finalArgs, args[2])
+		finalArgs = append(finalArgs, args[3])
+
+		request := TransferDetails{}
+		if err := request.FillFromArguments(finalArgs); err != nil {
+			message := fmt.Sprintf("cannot read transfer details from arguments: %s", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		if bytes, err := json.Marshal(request); err == nil {
+			logger.Debug("Request: " + string(bytes))
+		}
+
+		if GetCreatorOrganization(stub) != request.Key.RequestSender {
+			message := fmt.Sprintf(
+				"no privileges to send request from the side of organization %s (caller is from organization %s)",
+				request.Key.RequestSender, GetCreatorOrganization(stub))
+			logger.Error(message)
+			return pb.Response{Status: 403, Message: message}
+		}
+
+		logger.Debug("RequestSender: " + request.Key.RequestSender)
+
+		if request.ExistsIn(stub) {
+			if err := request.LoadFrom(stub); err != nil {
+				message := fmt.Sprintf("cannot load existing request: %s", err.Error())
+				logger.Error(message)
+				return pb.Response{Status: 404, Message: message}
+			}
+
+			if request.Value.Status == statusInitiated {
+				message := "ownership transfer is already initiated"
+				logger.Error(message)
+				return shim.Error(message)
+			}
+		}
+
+		if err := checkProductExistenceAndOwnership(stub, request.Key.ProductKey, request.Key.RequestReceiver); err != nil {
+			message := err.Error()
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		request.Value.Status = statusInitiated
+		request.Value.Message = finalArgs[basicArgumentsNumber]
+		request.Value.Timestamp = time.Now().UTC().Unix()
+
+		if err := request.UpdateOrInsertIn(stub); err != nil {
+			message := fmt.Sprintf("persistence error: %s", err.Error())
+			logger.Error(message)
+			return pb.Response{Status: 500, Message: message}
+		}
+
+		logger.Info("OwnershipChaincode.sendRequestBulk exited without errors")
+		logger.Debug("Success: OwnershipChaincode.sendRequestBulk")
+
+	}
+
 	return shim.Success(nil)
 }
 
@@ -247,36 +362,8 @@ func (t *OwnershipChaincode) transferAccepted(stub shim.ChaincodeStubInterface, 
 		return shim.Error(message)
 	}
 
-	type productPrice struct {
-		Value struct {
-			Price float64 `json:"price"`
-		} `json:"value"`
-	}
-
-	const queryFunctionName = "readProduct"
-
-	response := stub.InvokeChaincode(commonChaincodeName,
-		[][]byte{[]byte(queryFunctionName), []byte(details.Key.ProductKey)}, commonChannelName)
-
-	var p productPrice
-	if err := json.Unmarshal(response.Payload, &p); err != nil {
-		message := fmt.Sprintf("unable to unmarshal response on product %s from common channel with error: %s ", details.Key.ProductKey, err.Error())
-		logger.Error(message)
-		return shim.Error(err.Error())
-	}
-
-	discount, err := strconv.ParseFloat(args[3], 64)
-	if err != nil {
-		message := fmt.Sprintf("unable to convert  with error: %s ", err.Error())
-		logger.Error(message)
-		return shim.Error(err.Error())
-	}
-
-	discountPrice := (p.Value.Price * discount) / 100
-
 	details.Value.Status = statusAccepted
 	details.Value.Timestamp = time.Now().UTC().Unix()
-	details.Value.Price = p.Value.Price - discountPrice
 
 	if err := details.UpdateOrInsertIn(stub); err != nil {
 		message := fmt.Sprintf("persistence error: %s", err.Error())
@@ -553,6 +640,46 @@ func checkProductExistenceAndOwnership(stub shim.ChaincodeStubInterface, product
 	return nil
 }
 
+func getProductsFromLabel(stub shim.ChaincodeStubInterface, productKey, requiredOwner string) ([]string, error) {
+
+	logger.Debug("0 #########################################################################################################################################################################")
+	const queryFunctionName = "getProductsByLabel"
+	var finalProducts []string
+
+	response := stub.InvokeChaincode(commonChaincodeName,
+		[][]byte{[]byte(queryFunctionName), []byte(productKey)}, commonChannelName)
+
+	logger.Debug("0.1 #########################################################################################################################################################################")
+
+	if response.Status >= 400 {
+		return finalProducts, errors.New(
+			fmt.Sprintf("unable to read product %s from common channel: %s", productKey, response.Message))
+	} else {
+		logger.Debug("1 #########################################################################################################################################################################")
+		logger.Debug(response.Payload)
+		logger.Debug("1.1 #########################################################################################################################################################################")
+
+		products := []Product{}
+		if err := json.Unmarshal(response.Payload, &products); err != nil {
+			return finalProducts, errors.New(
+				fmt.Sprintf("unable to unmarshal response on product %s from common channel", productKey))
+		}
+
+		for i := 0; i < len(products); i++ {
+			if products[i].Value.Owner == requiredOwner {
+				finalProducts = append(finalProducts, products[i].Key.Name)
+			}
+		}
+		logger.Debug("2.1 #########################################################################################################################################################################")
+		logger.Debug(products)
+		logger.Debug(finalProducts)
+		logger.Debug("2.2 #########################################################################################################################################################################")
+
+	}
+
+	return finalProducts, nil
+}
+
 func getOrganization(certificate []byte) string {
 	data := certificate[strings.Index(string(certificate), "-----") : strings.LastIndex(string(certificate), "-----")+5]
 	block, _ := pem.Decode([]byte(data))
@@ -571,4 +698,48 @@ func main() {
 	if err != nil {
 		logger.Error(err.Error())
 	}
+}
+
+func getQueryResultForQueryString(stub shim.ChaincodeStubInterface, queryString string) ([]byte, error) {
+
+	fmt.Printf("- getQueryResultForQueryString queryString:\n%s\n", queryString)
+
+	resultsIterator, err := stub.GetQueryResult(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	entries := []Product{}
+
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		entry := Product{}
+
+		if err := json.Unmarshal(response.Value, &entry.Value); err != nil {
+			return nil, err
+		}
+
+		_, compositeKeyParts, err := stub.SplitCompositeKey(response.Key)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := entry.FillFromCompositeKeyParts(compositeKeyParts); err != nil {
+			return nil, err
+		}
+
+		entries = append(entries, entry)
+	}
+
+	result, err := json.Marshal(entries)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
