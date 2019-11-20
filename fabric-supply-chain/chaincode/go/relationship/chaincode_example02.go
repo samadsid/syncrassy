@@ -50,6 +50,8 @@ func (t *OwnershipChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Respons
 		return t.history(stub, args)
 	} else if function == "sendRequestBulk" {
 		return t.sendRequestBulk(stub, args)
+	} else if function == "queryDetailsbyProduct" {
+		return t.queryDetailsbyProduct(stub, args)
 	}
 
 	message := "invalid invoke function name. " +
@@ -742,4 +744,72 @@ func getQueryResultForQueryString(stub shim.ChaincodeStubInterface, queryString 
 	}
 
 	return result, nil
+}
+
+func (t *OwnershipChaincode) queryDetailsbyProduct(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) < 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1")
+	}
+
+	it, err := stub.GetStateByPartialCompositeKey(transferIndex, []string{})
+	if err != nil {
+		message := fmt.Sprintf("unable to get state by partial composite key %s: %s", transferIndex, err.Error())
+		logger.Error(message)
+		return shim.Error(message)
+	}
+	defer it.Close()
+
+	entries := []TransferDetails{}
+	for it.HasNext() {
+		response, err := it.Next()
+		if err != nil {
+			message := fmt.Sprintf("unable to get an element next to a query iterator: %s", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		logger.Debug(fmt.Sprintf("Response: {%s, %s}", response.Key, string(response.Value)))
+
+		entry := TransferDetails{}
+
+		if err := entry.FillFromLedgerValue(response.Value); err != nil {
+			message := fmt.Sprintf("cannot fill transfer details value from response value: %s", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		_, compositeKeyParts, err := stub.SplitCompositeKey(response.Key)
+		if err != nil {
+			message := fmt.Sprintf("cannot split response key into composite key parts slice: %s", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		productID := compositeKeyParts[0]
+
+		if err := entry.FillFromCompositeKeyParts(compositeKeyParts); err != nil {
+			message := fmt.Sprintf("cannot fill transfer details key from composite key parts: %s", err.Error())
+			logger.Error(message)
+			return shim.Error(message)
+		}
+
+		if productID == args[0] {
+			if bytes, err := json.Marshal(entry); err == nil {
+				logger.Debug("Entry: " + string(bytes))
+			}
+
+			entries = append(entries, entry)
+		}
+	}
+
+	result, err := json.Marshal(entries)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
+	logger.Debug("Result: " + string(result))
+
+	logger.Info("OwnershipChaincode.query exited without errors")
+	logger.Debug("Success: OwnershipChaincode.query")
+	return shim.Success(result)
 }
